@@ -65,6 +65,7 @@ class OnPolicyRunner:
         self.env = env
 
         print("Using MLP and Priviliged Env encoder ActorCritic structure")
+        print("Policy config:", self.policy_cfg)
         actor_critic: ActorCriticRMA = ActorCriticRMA(self.env.cfg.env.n_proprio,
                                                       self.env.cfg.env.n_scan,
                                                       self.env.num_obs,

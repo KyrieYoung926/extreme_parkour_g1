@@ -1,4 +1,5 @@
-from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
+from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg
+from ..base.legged_robot_config import LeggedRobotCfgPPO
 
 class G1RoughCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
@@ -72,7 +73,7 @@ class G1RoughCfg( LeggedRobotCfg ):
             dof_pos_limits = -5.0
 
 class G1RoughCfgPPO( LeggedRobotCfgPPO ):
-    class policy:
+    class policy(LeggedRobotCfgPPO.policy):
         init_noise_std = 0.8
     class algorithm( LeggedRobotCfgPPO.algorithm ):
         entropy_coef = 0.01
