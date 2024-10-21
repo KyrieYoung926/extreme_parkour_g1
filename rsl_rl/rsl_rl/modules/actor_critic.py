@@ -226,11 +226,10 @@ class ActorCriticRMA(nn.Module):
         super(ActorCriticRMA, self).__init__()
 
         self.kwargs = kwargs
-        # priv_encoder_dims= kwargs['priv_encoder_dims']
-        priv_encoder_dims = kwargs.get('priv_encoder_dims', [64, 20])  # 设置默认值
+        priv_encoder_dims= kwargs['priv_encoder_dims']
         activation = get_activation(activation)
         
-        self.actor = Actor(num_prop, num_scan, num_actions, scan_encoder_dims, actor_hidden_dims, priv_encoder_dims, num_priv_latent, num_priv_explicit, num_hist, activation, tanh_encoder_output=kwargs.get('tanh_encoder_output', False))
+        self.actor = Actor(num_prop, num_scan, num_actions, scan_encoder_dims, actor_hidden_dims, priv_encoder_dims, num_priv_latent, num_priv_explicit, num_hist, activation, tanh_encoder_output=kwargs('tanh_encoder_output'))
         
 
         # Value function
