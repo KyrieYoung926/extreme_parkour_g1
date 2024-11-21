@@ -143,10 +143,8 @@ class TaskRegistry():
             log_dir = None
         else:
             log_dir = log_root#os.path.join(log_root, datetime.now().strftime('%b%d_%H-%M-%S') + '_' + train_cfg.runner.run_name)
-
-        print('train_cfg:', train_cfg)
+        
         train_cfg_dict = class_to_dict(train_cfg)
-        print('train_cfg_dict:', train_cfg_dict)
         runner = OnPolicyRunner(env, 
                                 train_cfg_dict, 
                                 log_dir, 
@@ -165,7 +163,7 @@ class TaskRegistry():
             resume_path = get_load_path(log_root, load_run=train_cfg.runner.load_run, checkpoint=train_cfg.runner.checkpoint)
             runner.load(resume_path)
             if not train_cfg.policy.continue_from_last_std:
-                runner.alg.actor_critic.reset_std(train_cfg.policy.init_noise_std, 12, device=runner.device)
+                runner.alg.actor_critic.reset_std(train_cfg.policy.init_noise_std, 19, device=runner.device)
 
         if "return_log_dir" in kwargs:
             return runner, train_cfg, os.path.dirname(resume_path)

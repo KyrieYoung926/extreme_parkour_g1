@@ -117,7 +117,7 @@ class Terrain:
     def curiculum(self, random=False, max_difficulty=False):
         for j in range(self.cfg.num_cols):
             for i in range(self.cfg.num_rows):
-                difficulty = i / (self.cfg.num_rows-1)
+                difficulty = i / (self.cfg.num_rows-1) / 2
                 choice = j / self.cfg.num_cols + 0.001
                 if random:
                     if max_difficulty:

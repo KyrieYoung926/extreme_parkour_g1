@@ -150,6 +150,7 @@ class LeggedRobotCfg(BaseConfig):
         stepping_stone_distance = [0.02, 0.08]
         downsampled_scale = 0.075
         curriculum = True
+        max_difficulty = False
 
         all_vertical = False
         no_flat = True
@@ -184,11 +185,11 @@ class LeggedRobotCfg(BaseConfig):
                         "platform": 0.,
                         "large stairs up": 0.,
                         "large stairs down": 0.,
-                        "parkour": 0.2,
-                        "parkour_hurdle": 0.2,
-                        "parkour_flat": 0.2,
-                        "parkour_step": 0.2,
-                        "parkour_gap": 0.2,
+                        "parkour": 1.0,
+                        "parkour_hurdle": 0.,
+                        "parkour_flat": 0.,
+                        "parkour_step": 0.,
+                        "parkour_gap": 0.,
                         "demo": 0.0,}
         terrain_proportions = list(terrain_dict.values())
         

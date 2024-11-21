@@ -426,8 +426,6 @@ class LeggedRobot(BaseTask):
                 obs_buf.unsqueeze(1)
             ], dim=1)
         )
-        print("contact_buf shape:", self.contact_buf.shape)
-        print("contact_filt shape:", self.contact_filt.shape)
 
         self.contact_buf = torch.where(
             (self.episode_length_buf <= 1)[:, None, None], 
@@ -721,7 +719,7 @@ class LeggedRobot(BaseTask):
         self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
         self.base_quat = self.root_states[:, 3:7]
 
-        self.force_sensor_tensor = gymtorch.wrap_tensor(force_sensor_tensor).view(self.num_envs, 2, 6) # for feet only, see create_env()
+        self.force_sensor_tensor = gymtorch.wrap_tensor(force_sensor_tensor).view(self.num_envs, 4, 6) # for feet only, see create_env()
         self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis
 
         # initialize some data used later on
@@ -745,7 +743,7 @@ class LeggedRobot(BaseTask):
         if self.cfg.env.history_encoding:
             self.obs_history_buf = torch.zeros(self.num_envs, self.cfg.env.history_len, self.cfg.env.n_proprio, device=self.device, dtype=torch.float)
         self.action_history_buf = torch.zeros(self.num_envs, self.cfg.domain_rand.action_buf_len, self.num_dofs, device=self.device, dtype=torch.float)
-        self.contact_buf = torch.zeros(self.num_envs, self.cfg.env.contact_buf_len, 2, device=self.device, dtype=torch.float)
+        self.contact_buf = torch.zeros(self.num_envs, self.cfg.env.contact_buf_len, 4, device=self.device, dtype=torch.float)
 
         self.commands = torch.zeros(self.num_envs, self.cfg.commands.num_commands, dtype=torch.float, device=self.device, requires_grad=False) # x vel, y vel, yaw vel, heading
         self._resample_commands(torch.arange(self.num_envs, device=self.device, requires_grad=False))
@@ -932,8 +930,7 @@ class LeggedRobot(BaseTask):
         feet_names = [s for s in body_names if self.cfg.asset.foot_name in s]
 
 
-        # for s in ["FR_foot", "FL_foot", "RR_foot", "RL_foot"]:
-        for s in ["left_ankle_roll_link", "right_ankle_roll_link"]:
+        for s in ["FR_foot", "FL_foot", "RR_foot", "RL_foot"]:
             feet_idx = self.gym.find_asset_rigid_body_index(robot_asset, s)
             sensor_pose = gymapi.Transform(gymapi.Vec3(0.0, 0.0, 0.0))
             self.gym.create_asset_force_sensor(robot_asset, feet_idx, sensor_pose)
@@ -1000,23 +997,18 @@ class LeggedRobot(BaseTask):
         for i in range(len(termination_contact_names)):
             self.termination_contact_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], termination_contact_names[i])
 
-        # hip_names = ["FR_hip_joint", "FL_hip_joint", "RR_hip_joint", "RL_hip_joint"]
-        hip_names = ["left_hip_yaw_joint", "left_hip_roll_joint", "left_hip_pitch_joint", "right_hip_yaw_joint", "right_hip_roll_joint", "right_hip_pitch_joint"]
+        hip_names = ["FR_hip_joint", "FL_hip_joint", "RR_hip_joint", "RL_hip_joint"]
         self.hip_indices = torch.zeros(len(hip_names), dtype=torch.long, device=self.device, requires_grad=False)
         for i, name in enumerate(hip_names):
             self.hip_indices[i] = self.dof_names.index(name)
-
-        # thigh_names = ["FR_thigh_joint", "FL_thigh_joint", "RR_thigh_joint", "RL_thigh_joint"]
-
-        # self.thigh_indices = torch.zeros(len(thigh_names), dtype=torch.long, device=self.device, requires_grad=False)
-        # for i, name in enumerate(thigh_names):
-        #     self.thigh_indices[i] = self.dof_names.index(name)
-
-        # calf_names = ["FR_calf_joint", "FL_calf_joint", "RR_calf_joint", "RL_calf_joint"]
-
-        # self.calf_indices = torch.zeros(len(calf_names), dtype=torch.long, device=self.device, requires_grad=False)
-        # for i, name in enumerate(calf_names):
-        #     self.calf_indices[i] = self.dof_names.index(name)
+        thigh_names = ["FR_thigh_joint", "FL_thigh_joint", "RR_thigh_joint", "RL_thigh_joint"]
+        self.thigh_indices = torch.zeros(len(thigh_names), dtype=torch.long, device=self.device, requires_grad=False)
+        for i, name in enumerate(thigh_names):
+            self.thigh_indices[i] = self.dof_names.index(name)
+        calf_names = ["FR_calf_joint", "FL_calf_joint", "RR_calf_joint", "RL_calf_joint"]
+        self.calf_indices = torch.zeros(len(calf_names), dtype=torch.long, device=self.device, requires_grad=False)
+        for i, name in enumerate(calf_names):
+            self.calf_indices[i] = self.dof_names.index(name)
     
     def _get_env_origins(self):
         """ Sets environment origins. On rough terrain the origins are defined by the terrain platforms.
@@ -1292,65 +1284,3 @@ class LeggedRobot(BaseTask):
         self.feet_at_edge = self.contact_filt & feet_at_edge
         rew = (self.terrain_levels > 3) * torch.sum(self.feet_at_edge, dim=-1)
         return rew
-
-
-#-------------g1----------------
-    def _reward_base_height(self):
-        # Penalize base height away from target
-        base_height = self.root_states[:, 2]
-        return torch.square(base_height - self.cfg.rewards.base_height_target)
-    
-    def _reward_dof_pos_limits(self):
-        # Penalize dof positions too close to the limit
-        out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.) # lower limit
-        out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.)
-        return torch.sum(out_of_limits, dim=1)
-    
-    def _reward_feet_air_time(self):
-        # Reward long steps
-        # Need to filter the contacts because the contact reporting of PhysX is unreliable on meshes
-        contact = self.contact_forces[:, self.feet_indices, 2] > 1.
-        contact_filt = torch.logical_or(contact, self.last_contacts) 
-        self.last_contacts = contact
-        first_contact = (self.feet_air_time > 0.) * contact_filt
-        self.feet_air_time += self.dt
-        rew_airTime = torch.sum((self.feet_air_time - 0.5) * first_contact, dim=1) # reward only on first contact with the ground
-        rew_airTime *= torch.norm(self.commands[:, :2], dim=1) > 0.1 #no reward for zero command
-        self.feet_air_time *= ~contact_filt
-        return rew_airTime
-    
-    def _reward_feet_contact_forces(self):
-        # penalize high contact forces
-        return torch.sum((torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1) -  self.cfg.rewards.max_contact_force).clip(min=0.), dim=1)
-    
-    def _reward_stand_still(self):
-        # Penalize motion at zero commands
-        return torch.sum(torch.abs(self.dof_pos - self.default_dof_pos), dim=1) * (torch.norm(self.commands[:, :2], dim=1) < 0.1)
-
-    def _reward_stumble(self):
-        # Penalize feet hitting vertical surfaces
-        return torch.any(torch.norm(self.contact_forces[:, self.feet_indices, :2], dim=2) >\
-             5 *torch.abs(self.contact_forces[:, self.feet_indices, 2]), dim=1)
-  
-    def _reward_tracking_ang_vel(self):
-        # Tracking of angular velocity commands (yaw) 
-        ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 2])
-        return torch.exp(-ang_vel_error/self.cfg.rewards.tracking_sigma)
-
-    def _reward_tracking_lin_vel(self):
-        # Tracking of linear velocity commands (xy axes)
-        lin_vel_error = torch.sum(torch.square(self.commands[:, :2] - self.base_lin_vel[:, :2]), dim=1)
-        return torch.exp(-lin_vel_error/self.cfg.rewards.tracking_sigma)
-    
-    def _reward_torque_limits(self):
-        # penalize torques too close to the limit
-        return torch.sum((torch.abs(self.torques) - self.torque_limits*self.cfg.rewards.soft_torque_limit).clip(min=0.), dim=1)
-
-    def _reward_dof_vel_limits(self):
-        # Penalize dof velocities too close to the limit
-        # clip to max error = 1 rad/s per joint to avoid huge penalties
-        return torch.sum((torch.abs(self.dof_vel) - self.dof_vel_limits*self.cfg.rewards.soft_dof_vel_limit).clip(min=0., max=1.), dim=1)
-
-    def _reward_termination(self):
-        # Terminal reward / penalty
-        return self.reset_buf * ~self.time_out_buf
